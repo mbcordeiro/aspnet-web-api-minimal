@@ -1,6 +1,11 @@
-using CatalogApi.Context;
+﻿using CatalogApi.Context;
 using CatalogApi.Model;
+using CatalogApi.Service;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +15,44 @@ builder.Services.AddSwaggerGen();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(connectionString,ServerVersion.AutoDetect(connectionString)));
+builder.Services.AddSingleton<ITokenService>(new TokenService());
+builder.Services.AddAuthentication
+                 (JwtBearerDefaults.AuthenticationScheme)
+                 .AddJwtBearer(options =>
+                 {
+                     options.TokenValidationParameters = new TokenValidationParameters
+                     {
+                         ValidateIssuer = true,
+                         ValidateAudience = true,
+                         ValidateLifetime = true,
+                         ValidateIssuerSigningKey = true,
+                         ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                         ValidAudience = builder.Configuration["Jwt:Audience"],
+                         IssuerSigningKey = new SymmetricSecurityKey
+                         (Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+                     };
+                 });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
+
+app.MapPost("/login", [AllowAnonymous] (User user, ITokenService tokenService) =>
+{
+    if (user == null) return Results.BadRequest("Invalid Login");
+    if (user.Username == "mbcordeiro" && user.Password == "pass#123")
+    {
+        var tokenString = tokenService.GenerateToken(app.Configuration["Jwt:Key"],
+            app.Configuration["Jwt:Issuer"],
+            app.Configuration["Jwt:Audience"],
+            user);
+        return Results.Ok(new { token = tokenString });
+    }
+    else return Results.BadRequest("Invalid Login");
+}).Produces(StatusCodes.Status400BadRequest)
+              .Produces(StatusCodes.Status200OK)
+              .WithName("Login")
+              .WithTags("Authentication");
 
 app.MapPost("/categories", async (Category categroy, AppDbContext db) =>
 {
@@ -96,5 +138,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.Run();
