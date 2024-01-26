@@ -11,9 +11,7 @@ builder.AddAutenticationJwt();
 var app = builder.Build();
 
 app.MapAuthenticationEndpoints();
-
 app.MapCategoriesEndpoints();
-
 app.MapProductsEndpoints();
 
 var environment = app.Environment;

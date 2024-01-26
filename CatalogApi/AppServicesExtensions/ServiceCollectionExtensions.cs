@@ -64,6 +64,7 @@ namespace CatalogApi.AppServicesExtensions
             builder.Services.AddSingleton<ITokenService>(new TokenService());
             return builder;
         }
+
         public static WebApplicationBuilder AddAutenticationJwt(this WebApplicationBuilder builder)
         {
             builder.Services.AddAuthentication
